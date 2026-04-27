@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐾 동물 대탈출</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:'Jua',sans-serif; background:#1a1a2e; overflow:hidden; width:100vw; height:100vh; display:flex; flex-direction:column; touch-action:manipulation; }
+.screen { display:none; width:100%; height:100%; flex-direction:column; align-items:center; justify-content:center; }
+.screen.active { display:flex; }
+#screen-start { background:linear-gradient(160deg,#0d1b4b,#1a3a6b 50%,#0d2a1a); gap:24px; padding:32px 24px; }
+.title-main { font-size:42px; color:#fff; text-shadow:0 4px 20px rgba(0,100,255,0.4); text-align:center; }
+.title-sub { font-size:16px; color:rgba(255,255,255,0.6); text-align:center; margin-top:6px; }
+.char-select { display:flex; gap:20px; justify-content:center; width:100%; }
+.char-btn { background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.2); border-radius:20px; padding:16px 20px; cursor:pointer; text-align:center; transition:all 0.2s; flex:1; max-width:160px; }
+.char-btn.selected { background:rgba(255,200,0,0.2); border-color:#ffd700; transform:scale(1.05); }
+.char-btn img { width:90px; height:90px; object-fit:contain; }
+.char-name { font-size:18px; color:#fff; margin-top:8px; }
+.start-btn { background:linear-gradient(135deg,#ff6b35,#ff4500); border:none; border-radius:50px; padding:18px 56px; font-family:'Jua',sans-serif; font-size:26px; color:#fff; cursor:pointer; box-shadow:0 6px 30px rgba(255,100,0,0.5); }
+.start-btn:active { transform:scale(0.95); }
+#screen-game { background:#87ceeb; padding:0; gap:0; justify-content:flex-start; }
+.hud { width:100%; padding:10px 16px 8px; background:rgba(0,0,0,0.25); display:flex; align-items:center; gap:12px; backdrop-filter:blur(4px); z-index:10; }
+.hud-stage { font-size:14px; color:#fff; white-space:nowrap; }
+.hud-progress { flex:1; height:10px; background:rgba(0,0,0,0.3); border-radius:99px; overflow:hidden; }
+.hud-progress-fill { height:100%; background:linear-gradient(90deg,#ffe000,#ff8c00); border-radius:99px; transition:width 0.4s; }
+.hp-display { display:flex; gap:3px; }
+.hp-heart { font-size:18px; transition:all 0.3s; }
+.hp-heart.empty { filter:grayscale(1) opacity(0.4); }
+.sound-btn { background:none; border:none; font-size:22px; cursor:pointer; }
+#game-canvas { width:100%; flex:1; display:block; }
+.vocab-area { width:100%; padding:10px 16px 12px; background:rgba(0,0,0,0.3); backdrop-filter:blur(4px); display:flex; flex-direction:column; align-items:center; gap:10px; }
+.vocab-word { font-size:44px; color:#fff; letter-spacing:2px; text-shadow:0 2px 12px rgba(0,0,0,0.5); min-height:56px; display:flex; align-items:center; }
+.vocab-feedback { font-size:18px; min-height:24px; }
+.vocab-feedback.correct { color:#7fff00; }
+.vocab-feedback.wrong { color:#ff6b6b; }
+.mic-btn { width:80px; height:80px; border-radius:50%; background:linear-gradient(135deg,#ff6b35,#e63900); border:3px solid rgba(255,255,255,0.3); font-size:36px; cursor:pointer; box-shadow:0 4px 20px rgba(255,100,0,0.5); transition:all 0.15s; display:flex; align-items:center; justify-content:center; }
+.mic-btn.listening { background:linear-gradient(135deg,#00c853,#00a844); }
+.mic-btn.disabled { background:#555; box-shadow:none; cursor:default; opacity:0.8; }
+.checkpoint-popup { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
+.checkpoint-popup.show { display:flex; }
+.checkpoint-box { background:linear-gradient(135deg,#1a3a6b,#0d2a1a); border:3px solid #ffd700; border-radius:24px; padding:32px 48px; text-align:center; animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes popIn { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+.cp-title { font-size:28px; color:#ffd700; }
+.cp-char-img { width:80px; height:80px; object-fit:contain; margin:10px 0; }
+.cp-stage { font-size:20px; color:#fff; }
+.cp-stars { font-size:40px; margin:10px 0; }
+.cp-btn { margin-top:8px; background:#ffd700; border:none; border-radius:50px; padding:14px 40px; font-family:'Jua',sans-serif; font-size:22px; color:#000; cursor:pointer; }
+#screen-result { background:linear-gradient(160deg,#0d1b4b,#1a3a1a); gap:20px; padding:32px 24px; }
+.result-title { font-size:36px; color:#ffd700; }
+.result-char-img { width:100px; height:100px; object-fit:contain; }
+.result-stats { width:100%; max-width:360px; }
+.result-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.1); font-size:16px; color:#fff; }
+.result-stars { color:#ffd700; font-size:20px; }
+.result-total { font-size:24px; color:#ffd700; text-align:center; margin-top:12px; }
+.replay-btn { background:linear-gradient(135deg,#ff6b35,#ff4500); border:none; border-radius:50px; padding:16px 48px; font-family:'Jua',sans-serif; font-size:22px; color:#fff; cursor:pointer; }
+#screen-gameover { background:linear-gradient(160deg,#3a0000,#1a0000); gap:20px; padding:32px 24px; }
+.go-title { font-size:48px; color:#ff4444; text-shadow:0 0 30px rgba(255,0,0,0.5); }
+.go-char-img { width:90px; height:90px; object-fit:contain; }
+.go-sub { font-size:20px; color:rgba(255,255,255,0.7); text-align:center; }
+.go-btn { background:#ff4444; border:none; border-radius:50px; padding:16px 48px; font-family:'Jua',sans-serif; font-size:22px; color:#fff; cursor:pointer; margin-top:8px; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+.shake { animation:shake 0.4s ease; }
+</style>
+</head>
+<body>
+
+<div id="screen-start" class="screen active">
+  <div class="title-main">🐾 동물 대탈출</div>
+  <div class="title-sub">어휘를 읽고 호랑이를 피해 탈출하라!</div>
+  <div class="char-select">
+    <div class="char-btn selected" data-char="rabbit" onclick="selectChar(this)">
+      <img id="prev-rabbit" alt="토끼">
+      <div class="char-name">토끼</div>
+    </div>
+    <div class="char-btn" data-char="deer" onclick="selectChar(this)">
+      <img id="prev-deer" alt="사슴">
+      <div class="char-name">사슴</div>
+    </div>
+  </div>
+  <button class="start-btn" onclick="startGame()">출발! 🚀</button>
+</div>
+
+<div id="screen-game" class="screen">
+  <div class="hud">
+    <div class="hud-stage" id="hud-stage">🌳 구간 1/4</div>
+    <div class="hud-progress"><div class="hud-progress-fill" id="hud-fill" style="width:0%"></div></div>
+    <div class="hp-display" id="hp-display"></div>
+    <button class="sound-btn" id="sound-btn" onclick="toggleSound()">🔊</button>
+  </div>
+  <canvas id="game-canvas"></canvas>
+  <div class="vocab-area">
+    <div class="vocab-word" id="vocab-word">-</div>
+    <div class="vocab-feedback" id="vocab-feedback"></div>
+    <button class="mic-btn" id="mic-btn" onclick="startListening()">🎤</button>
+  </div>
+</div>
+
+<div class="checkpoint-popup" id="checkpoint-popup">
+  <div class="checkpoint-box">
+    <div class="cp-title" id="cp-title">🎉 구간 통과!</div>
+    <img class="cp-char-img" id="cp-char-img" alt="">
+    <div class="cp-stage" id="cp-stage"></div>
+    <div class="cp-stars" id="cp-stars">⭐⭐⭐</div>
+    <button class="cp-btn" onclick="nextStage()">계속 달려! →</button>
+  </div>
+</div>
+
+<div id="screen-result" class="screen">
+  <div class="result-title">🏠 탈출 성공!</div>
+  <img class="result-char-img" id="result-char-img" alt="">
+  <div class="result-stats" id="result-stats"></div>
+  <div class="result-total" id="result-total"></div>
+  <button class="replay-btn" onclick="resetGame()">다시 하기 🔄</button>
+</div>
+
+<div id="screen-gameover" class="screen">
+  <div class="go-title">😱 잡혔다!</div>
+  <img class="go-char-img" id="go-char-img" alt="">
+  <div class="go-sub" id="go-sub"></div>
+  <button class="go-btn" onclick="retryStage()">다시 도전! 🔥</button>
+  <button class="go-btn" style="background:#555;margin-top:4px;" onclick="resetGame()">처음부터 🔄</button>
+</div>
+
+<script>
+// ── 외부 이미지 (깃허브) 연결 ──
+const GITHUB_URL = "https://raw.githubusercontent.com/garlihak/garlihak/main/";
+
+const SRC = {
+  rabbit: GITHUB_URL + "rabbit.png",
+  deer: GITHUB_URL + "deer.png",
+  tiger: GITHUB_URL + "tiger.png"
+};
+// 복구된 이미지 로딩 로직
+const IMG = {};
+Object.entries(SRC).forEach(([k, v]) => { 
+    const i = new Image(); 
+    i.src = v; 
+    IMG[k] = i; 
+});
+
+// 시작 화면 미리보기 이미지 세팅
+document.getElementById('prev-rabbit').src = SRC.rabbit;
+document.getElementById('prev-deer').src = SRC.deer;
+
+// ── 오디오 ──
+const AudioSys = {
+  ctx:null, enabled:true, bgmTimer:null, bgmStep:0, bgmTempo:350,
+  init(){ if(!this.ctx) this.ctx=new(window.AudioContext||window.webkitAudioContext)(); if(this.ctx.state==='suspended') this.ctx.resume(); if(!this.bgmTimer) this.scheduleBGM(); },
+  playTone(freq,type,dur,vol,delay=0){
+    if(!this.enabled||!this.ctx) return;
+    const now=this.ctx.currentTime+delay, osc=this.ctx.createOscillator(), gain=this.ctx.createGain();
+    osc.type=type; osc.frequency.setValueAtTime(freq,now);
+    gain.gain.setValueAtTime(0,now); gain.gain.linearRampToValueAtTime(vol,now+0.02); gain.gain.exponentialRampToValueAtTime(0.001,now+dur);
+    osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now+dur);
+  },
+  correct(){ this.playTone(523.25,'sine',0.15,0.3,0); this.playTone(659.25,'sine',0.15,0.3,0.1); this.playTone(783.99,'sine',0.3,0.3,0.2); },
+  wrong(){
+    if(!this.enabled||!this.ctx) return;
+    const now=this.ctx.currentTime, osc=this.ctx.createOscillator(), gain=this.ctx.createGain();
+    osc.type='sawtooth'; osc.frequency.setValueAtTime(200,now); osc.frequency.exponentialRampToValueAtTime(50,now+0.4);
+    gain.gain.setValueAtTime(0,now); gain.gain.linearRampToValueAtTime(0.3,now+0.02); gain.gain.exponentialRampToValueAtTime(0.001,now+0.4);
+    osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now+0.4);
+  },
+  checkpoint(){ this.playTone(523.25,'triangle',0.2,0.3,0); this.playTone(659.25,'triangle',0.2,0.3,0.15); this.playTone(783.99,'triangle',0.4,0.3,0.3); this.playTone(1046.5,'triangle',0.6,0.3,0.45); },
+  gameover(){ this.playTone(392,'sawtooth',0.3,0.3,0); this.playTone(349.23,'sawtooth',0.3,0.3,0.3); this.playTone(329.63,'sawtooth',0.3,0.3,0.6); this.playTone(261.63,'sawtooth',0.8,0.3,0.9); },
+  scheduleBGM(){
+    if(AudioSys.enabled && state.hp>0 && !$('checkpoint-popup').classList.contains('show') && $('screen-game').classList.contains('active')){
+      const freqs=[130.81,196.22,163.56,196.22];
+      AudioSys.playTone(freqs[AudioSys.bgmStep%4],'square',AudioSys.bgmTempo/1000*0.7,0.05);
+      AudioSys.bgmStep++;
+    }
+    AudioSys.bgmTimer=setTimeout(AudioSys.scheduleBGM, AudioSys.bgmTempo);
+  }
+};
+function toggleSound(){ AudioSys.enabled=!AudioSys.enabled; $('sound-btn').textContent=AudioSys.enabled?'🔊':'🔇'; }
+
+// ── 데이터 (단어 변경 완료 & 동적 길이 지원) ──
+const STAGES = [
+  { name:'🌳 숲 속', bg:['#2d6a1f','#87ceeb'], ground:'#3a7a28', emoji:'🌳', vocab:['싫다','많다','달다','볶다','먹다','걸다','닿다'] },
+  { name:'🌊 강가', bg:['#1a4a7a','#5bbcff'], ground:'#1a7a5a', emoji:'🌊', vocab:['넓다','맑다','걷다','앉다','잊다','좋다','잊다'] },
+  { name:'🏔️ 산길', bg:['#3a2a0a','#8a6a3a'], ground:'#5a4a2a', emoji:'🏔️', vocab:['씻다','옳다','끊다','씻다','맞다','빗다','끓다'] },
+  { name:'🌾 초원', bg:['#4a6a0a','#c8e860'], ground:'#6a8a2a', emoji:'🌾', vocab:['찾다','벗다','입다','찾다','엮다','꺾다'] },
+];
+
+let state={ selectedChar:'rabbit', stageIdx:0, vocabIdx:0, hp:3, playerX:0.15, tigerX:0, stageCorrect:0, totalCorrect:0, stageResults:[], listening:false, recognition:null, animFrame:null, startTime:0 };
+let particles=[], bgOffset=0;
+const $=id=>document.getElementById(id);
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
+
+function selectChar(btn){ document.querySelectorAll('.char-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); state.selectedChar=btn.dataset.char; }
+
+function startGame(){
+  AudioSys.init();
+  Object.assign(state,{stageIdx:0,vocabIdx:0,hp:3,playerX:0.15,tigerX:0,totalCorrect:0,stageResults:[],startTime:Date.now()});
+  loadStage(); showScreen('screen-game'); initCanvas(); renderLoop(); loadNextWord();
+}
+function loadStage(){ Object.assign(state,{vocabIdx:0,stageCorrect:0,playerX:0.15,tigerX:0}); updateHUD(); }
+function updateHUD(){
+  const s=STAGES[state.stageIdx];
+  const maxV = s.vocab.length; // 동적 단어 개수
+  $('hud-stage').textContent=`${s.name} · ${state.stageIdx+1}/${STAGES.length} (${Math.min(state.vocabIdx+1,maxV)}/${maxV})`;
+  $('hud-fill').style.width=(state.vocabIdx/maxV*100)+'%';
+  const hp=$('hp-display'); hp.innerHTML='';
+  for(let i=0;i<3;i++){ const h=document.createElement('span'); h.className='hp-heart'+(i>=state.hp?' empty':''); h.textContent='❤️'; hp.appendChild(h); }
+}
+
+const canvas=$('game-canvas'), ctx=canvas.getContext('2d');
+function initCanvas(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight-130-160; }
+window.addEventListener('resize',initCanvas);
+function renderLoop(){ if(state.animFrame) cancelAnimationFrame(state.animFrame); (function loop(){ draw(); state.animFrame=requestAnimationFrame(loop); })(); }
+
+function drawChar(imgObj, cx, groundY, size, flipX, t){
+  if(!imgObj.complete||imgObj.naturalWidth===0) return;
+  const bounce=Math.abs(Math.sin(t*0.004))*9;
+  const x=cx-size/2, y=groundY-size-bounce;
+  // 그림자
+  ctx.save(); ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath();
+  const ss=1-bounce/40; ctx.ellipse(cx,groundY+2,(size/2)*ss,5*ss,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  // 이미지
+  ctx.save();
+  if(flipX){ ctx.translate(cx+size/2,0); ctx.scale(-1,1); ctx.drawImage(imgObj,0,y,size,size); }
+  else { ctx.drawImage(imgObj,x,y,size,size); }
+  ctx.restore();
+}
+
+function drawForest(W,H){
+  // 하늘 그라디언트
+  const sky=ctx.createLinearGradient(0,0,0,H*0.72);
+  sky.addColorStop(0,'#87ceeb'); sky.addColorStop(1,'#c8f0a0');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
+
+  // 먼 산 실루엣 (느린 스크롤 0.3배)
+  const mOff=(bgOffset*0.3)%(W*0.6);
+  ctx.fillStyle='#4a8a3a';
+  for(let i=-1;i<3;i++){
+    const bx=(i*(W*0.6)-mOff+W*2)%( W*2)-W*0.3;
+    ctx.beginPath();
+    ctx.moveTo(bx,H*0.72);
+    ctx.bezierCurveTo(bx+W*0.1,H*0.35, bx+W*0.2,H*0.30, bx+W*0.3,H*0.72);
+    ctx.fill();
+  }
+
+  // 중간 나무 실루엣 (중간 스크롤 0.7배)
+  const tOff=(bgOffset*0.7)%160;
+  ctx.fillStyle='#2d5a1f';
+  for(let i=-1;i<W/160+2;i++){
+    const tx=(i*160-tOff+W)%W - 20;
+    const th=H*0.18+Math.sin(i*2.3)*H*0.04;
+    const ty=H*0.72-th;
+    // 삼각형 나무 머리
+    ctx.beginPath();
+    ctx.moveTo(tx+20,ty); ctx.lineTo(tx,ty+th*0.55); ctx.lineTo(tx+40,ty+th*0.55);
+    ctx.closePath(); ctx.fill();
+    // 아래 삼각형
+    ctx.beginPath();
+    ctx.moveTo(tx+20,ty+th*0.3); ctx.lineTo(tx-8,ty+th*0.75); ctx.lineTo(tx+48,ty+th*0.75);
+    ctx.closePath(); ctx.fill();
+    // 줄기
+    ctx.fillRect(tx+15,ty+th*0.75,10,th*0.25);
+  }
+
+  // 땅
+  ctx.fillStyle='#3a7a28'; ctx.fillRect(0,H*0.72,W,H*0.28);
+  // 풀잎 들쭉날쭉 선
+  ctx.fillStyle='#2d6a1f';
+  const gOff=(bgOffset*1.0)%40;
+  for(let x=-gOff;x<W+40;x+=18){
+    ctx.beginPath();
+    ctx.moveTo(x,H*0.72);
+    ctx.lineTo(x+5,H*0.72-12);
+    ctx.lineTo(x+9,H*0.72-5);
+    ctx.lineTo(x+14,H*0.72-16);
+    ctx.lineTo(x+18,H*0.72);
+    ctx.fill();
+  }
+  ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(0,H*0.72,W,5);
+}
+
+function drawRiver(W,H){
+  // 하늘
+  const sky=ctx.createLinearGradient(0,0,0,H*0.72);
+  sky.addColorStop(0,'#4a90d9'); sky.addColorStop(1,'#87ceeb');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
+
+  // 먼 배경 언덕 (느린 0.3배)
+  const hOff=(bgOffset*0.3)%(W*0.8);
+  ctx.fillStyle='#6aaa5a';
+  for(let i=-1;i<3;i++){
+    const bx=(i*(W*0.8)-hOff+W*2)%(W*2)-W*0.2;
+    ctx.beginPath();
+    ctx.moveTo(bx,H*0.72);
+    ctx.bezierCurveTo(bx+W*0.15,H*0.45, bx+W*0.35,H*0.40, bx+W*0.5,H*0.50);
+    ctx.bezierCurveTo(bx+W*0.6,H*0.55, bx+W*0.7,H*0.48, bx+W*0.8,H*0.72);
+    ctx.fill();
+  }
+
+  // 강물 (중간 레이어)
+  ctx.fillStyle='#5bbcff'; ctx.fillRect(0,H*0.55,W,H*0.17);
+  // 물결 (sin 곡선)
+  const wOff=(bgOffset*1.0)%80;
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.setLineDash([]);
+  for(let row=0;row<3;row++){
+    const wy=H*0.58+row*H*0.04;
+    ctx.beginPath();
+    for(let x=0;x<W+80;x+=4){
+      const y=wy+Math.sin((x+wOff+row*30)*0.08)*6;
+      x===0?ctx.moveTo(x-wOff%80,y):ctx.lineTo(x-wOff%80,y);
+    }
+    ctx.stroke();
+  }
+
+  // 다리 실루엣 (중간 스크롤 0.5배)
+  const bOff=(bgOffset*0.5)%(W*1.2);
+  ctx.fillStyle='#8a6a3a';
+  const bx=(W*0.4-bOff+W*2)%(W*1.2)-W*0.1;
+  if(bx>-150 && bx<W+50){
+    ctx.fillRect(bx,H*0.50,160,14);
+    ctx.fillRect(bx+10,H*0.50,12,H*0.22);
+    ctx.fillRect(bx+130,H*0.50,12,H*0.22);
+  }
+
+  // 땅 (모래색)
+  ctx.fillStyle='#c8a05a'; ctx.fillRect(0,H*0.72,W,H*0.28);
+  // 강물 경계
+  ctx.fillStyle='#3a8a6a'; ctx.fillRect(0,H*0.72,W,8);
+  ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(0,H*0.72,W,5);
+}
+
+function drawMountain(W,H){
+  // 황혼 하늘
+  const sky=ctx.createLinearGradient(0,0,0,H*0.72);
+  sky.addColorStop(0,'#4a3020'); sky.addColorStop(0.5,'#c07040'); sky.addColorStop(1,'#808080');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
+
+  // 먼 산 (느린 0.2배, 밝은 색)
+  const m1Off=(bgOffset*0.2)%(W*1.5);
+  ctx.fillStyle='#5a4535';
+  for(let i=-1;i<3;i++){
+    const mx=(i*(W*1.5)-m1Off+W*3)%(W*3)-W*0.5;
+    ctx.beginPath();
+    ctx.moveTo(mx,H*0.72);
+    ctx.lineTo(mx+W*0.3,H*0.18);
+    ctx.lineTo(mx+W*0.6,H*0.35);
+    ctx.lineTo(mx+W*0.75,H*0.20);
+    ctx.lineTo(mx+W*1.0,H*0.72);
+    ctx.fill();
+  }
+  // 중간 산 (중간 0.5배, 어두운 색)
+  const m2Off=(bgOffset*0.5)%(W*1.0);
+  ctx.fillStyle='#3a2a18';
+  for(let i=-1;i<3;i++){
+    const mx=(i*W-m2Off+W*2)%(W*2)-W*0.2;
+    ctx.beginPath();
+    ctx.moveTo(mx,H*0.72);
+    ctx.lineTo(mx+W*0.2,H*0.30);
+    ctx.lineTo(mx+W*0.4,H*0.45);
+    ctx.lineTo(mx+W*0.55,H*0.28);
+    ctx.lineTo(mx+W*0.7,H*0.72);
+    ctx.fill();
+  }
+
+  // 바위 (빠른 스크롤 0.9배)
+  const rOff=(bgOffset*0.9)%200;
+  ctx.fillStyle='#6a5040';
+  for(let i=-1;i<W/200+2;i++){
+    const rx=(i*200-rOff+W)%W;
+    ctx.beginPath();
+    ctx.ellipse(rx,H*0.72,28,16,0,Math.PI,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(rx+80,H*0.72,20,12,0,Math.PI,Math.PI*2); ctx.fill();
+  }
+
+  // 땅
+  ctx.fillStyle='#5a4a2a'; ctx.fillRect(0,H*0.72,W,H*0.28);
+  ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(0,H*0.72,W,5);
+}
+
+function drawPrairie(W,H){
+  // 밝은 낮 하늘
+  const sky=ctx.createLinearGradient(0,0,0,H*0.72);
+  sky.addColorStop(0,'#ffffa0'); sky.addColorStop(1,'#aae060');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
+
+  // 먼 언덕 (느린 0.3배)
+  const hOff=(bgOffset*0.3)%(W*0.9);
+  ctx.fillStyle='#7ab83a';
+  for(let i=-1;i<3;i++){
+    const bx=(i*(W*0.9)-hOff+W*2)%(W*2)-W*0.1;
+    ctx.beginPath();
+    ctx.moveTo(bx,H*0.72);
+    ctx.bezierCurveTo(bx+W*0.2,H*0.50, bx+W*0.5,H*0.45, bx+W*0.7,H*0.55);
+    ctx.bezierCurveTo(bx+W*0.8,H*0.60, bx+W*0.85,H*0.63, bx+W*0.9,H*0.72);
+    ctx.fill();
+  }
+
+  // 억새/해바라기 실루엣 (빠른 1.0배)
+  const fOff=(bgOffset*1.0)%100;
+  ctx.fillStyle='#5a8a20';
+  for(let i=-1;i<W/100+2;i++){
+    const fx=(i*100-fOff+W)%W;
+    const fh=H*0.12+Math.sin(i*1.7)*H*0.04;
+    // 줄기
+    ctx.fillRect(fx+18,H*0.72-fh,4,fh);
+    // 꽃머리 (원)
+    ctx.beginPath();
+    ctx.arc(fx+20,H*0.72-fh-10,10,0,Math.PI*2); ctx.fill();
+    // 꽃잎 색
+    ctx.fillStyle='#d4a020';
+    ctx.beginPath();
+    ctx.arc(fx+20,H*0.72-fh-10,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#5a8a20';
+    // 두번째 꽃
+    ctx.fillRect(fx+55,H*0.72-fh*0.85,3,fh*0.85);
+    ctx.fillStyle='#4a7a18';
+    ctx.beginPath();
+    ctx.arc(fx+56,H*0.72-fh*0.85-8,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#c49010';
+    ctx.beginPath();
+    ctx.arc(fx+56,H*0.72-fh*0.85-8,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#5a8a20';
+  }
+
+  // 땅
+  ctx.fillStyle='#6a8a2a'; ctx.fillRect(0,H*0.72,W,H*0.28);
+  ctx.fillStyle='#5a7a1a'; ctx.fillRect(0,H*0.72,W,6);
+  ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,H*0.72,W,4);
+}
+
+function draw(){
+  const W=canvas.width, H=canvas.height, stage=STAGES[state.stageIdx];
+  ctx.clearRect(0,0,W,H);
+  bgOffset=(bgOffset+0.4)%(W*3);
+
+  // 구간별 배경 그리기
+  if(state.stageIdx===0) drawForest(W,H);
+  else if(state.stageIdx===1) drawRiver(W,H);
+  else if(state.stageIdx===2) drawMountain(W,H);
+  else drawPrairie(W,H);
+
+  ctx.font='40px serif'; ctx.fillText('🏠',W*0.88-20,H*0.67);
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{ ctx.globalAlpha=p.life/30; ctx.font=p.size+'px serif'; ctx.fillText(p.emoji,p.x,p.y); p.x+=p.vx; p.y+=p.vy; p.life--; });
+  ctx.globalAlpha=1;
+  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=2; ctx.setLineDash([8,6]);
+  ctx.beginPath(); ctx.moveTo(0,H*0.75); ctx.lineTo(W,H*0.75); ctx.stroke(); ctx.setLineDash([]);
+
+  const popup=$('checkpoint-popup').classList.contains('show');
+  const maxV = STAGES[state.stageIdx].vocab.length; // 동적 단어 개수
+  
+  if(state.hp>0 && !popup && state.vocabIdx<maxV){
+    const dist=state.playerX-state.tigerX;
+    const targetGap=0.15, catchSeconds=5, frameRate=60;
+    if(dist>targetGap){ state.tigerX+=dist/(catchSeconds*frameRate); }
+    else{ state.tigerX+=0.0003; }
+    if(state.tigerX>=state.playerX){
+      state.hp--; AudioSys.wrong(); spawnParticles(state.playerX*W,H*0.6,false); updateHUD();
+      if(state.hp<=0){ if(state.recognition){try{state.recognition.stop();}catch(e){}} showGameOver(); }
+      else{ state.tigerX=Math.max(0,state.playerX-0.15); $('screen-game').classList.add('shake'); setTimeout(()=>$('screen-game').classList.remove('shake'),400); }
+    }
+  }
+
+  const gY=H*0.75, sz=Math.min(W*0.18,110), now=Date.now()-state.startTime;
+  drawChar(IMG.tiger, state.tigerX*W, gY, sz, true, now-200);
+  drawChar(IMG[state.selectedChar], state.playerX*W, gY, sz, false, now);
+
+  const warnDist=state.playerX-state.tigerX;
+  if(warnDist<0.15&&warnDist>0){
+    AudioSys.bgmTempo=180;
+    ctx.fillStyle=`rgba(255,0,0,${(0.15-warnDist)/0.15*0.25})`; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,50,50,0.9)'; ctx.font='26px Jua'; ctx.textAlign='center';
+    ctx.fillText('⚠️ 호랑이가 가까워요!',W/2,50); ctx.textAlign='left';
+  } else { AudioSys.bgmTempo=350; }
+}
+
+function spawnParticles(x,y,correct){
+  const e=correct?['⭐','✨','🌟','💫']:['💥','❌','😱'];
+  for(let i=0;i<6;i++) particles.push({x,y,vx:(Math.random()-0.5)*4,vy:-Math.random()*3-1,emoji:e[Math.floor(Math.random()*e.length)],size:20+Math.random()*10,life:30});
+}
+
+function loadNextWord(){
+  const s=STAGES[state.stageIdx];
+  if(state.vocabIdx>=s.vocab.length){ showCheckpoint(); return; }
+  $('vocab-word').textContent=s.vocab[state.vocabIdx];
+  $('vocab-feedback').textContent=''; $('vocab-feedback').className='vocab-feedback';
+  const btn=$('mic-btn'); btn.classList.remove('disabled','listening'); btn.textContent='🎤';
+}
+
+function startListening(){
+  const btn=$('mic-btn');
+  if(state.listening||btn.classList.contains('disabled')) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ alert('음성인식이 지원되지 않습니다.'); return; }
+  if(state.recognition){try{state.recognition.stop();}catch(e){}}
+  const rec=new SR(); rec.lang='ko-KR'; rec.interimResults=false; rec.maxAlternatives=5;
+  state.recognition=rec; state.listening=true; btn.classList.add('listening'); btn.textContent='👂';
+  rec.onresult=e=>{
+    state.listening=false;
+    const results=Array.from(e.results[0]).map(r=>r.transcript.trim().replace(/\s/g,''));
+    const target=STAGES[state.stageIdx].vocab[state.vocabIdx].replace(/\s/g,'');
+    handleAnswer(results.some(r=>r===target||r.includes(target)||target.includes(r)),results[0]);
+  };
+  rec.onerror=e=>{ state.listening=false; btn.classList.remove('listening'); if(e.error==='not-allowed'){ alert('마이크 권한을 허용해주세요!'); btn.textContent='🎤'; return; } handleAnswer(false,'(인식 실패)'); };
+  rec.onend=()=>{ state.listening=false; if(btn.classList.contains('listening')){ btn.classList.remove('listening'); btn.textContent='🎤'; } };
+  rec.start();
+}
+
+function handleAnswer(correct,heard){
+  const btn=$('mic-btn'); btn.classList.remove('listening'); btn.classList.add('disabled');
+  const px=state.playerX*canvas.width, H=canvas.height;
+  if(correct){
+    AudioSys.correct(); state.stageCorrect++; state.totalCorrect++; state.vocabIdx++;
+    state.playerX=Math.min(0.85,state.playerX+0.07); state.tigerX=Math.max(-0.1,state.tigerX-0.02);
+    $('vocab-feedback').textContent='✅ 맞아요!'; $('vocab-feedback').className='vocab-feedback correct';
+    btn.textContent='✅'; spawnParticles(px,H*0.6,true); updateHUD(); setTimeout(loadNextWord,700);
+  } else {
+    AudioSys.wrong(); state.hp--;
+    state.tigerX=Math.min(state.playerX-0.05,state.tigerX+0.08);
+    $('vocab-feedback').textContent=`❌ 다시! (들린 말: "${heard}")`; $('vocab-feedback').className='vocab-feedback wrong';
+    btn.textContent='❌'; spawnParticles(px,H*0.6,false);
+    document.querySelector('.vocab-area').classList.add('shake'); setTimeout(()=>document.querySelector('.vocab-area').classList.remove('shake'),400);
+    updateHUD();
+    if(state.hp<=0){ setTimeout(showGameOver,800); } else { setTimeout(()=>{ btn.textContent='🎤'; btn.classList.remove('disabled'); },700); }
+  }
+}
+
+function showCheckpoint(){
+  AudioSys.checkpoint();
+  const maxV = STAGES[state.stageIdx].vocab.length;
+  // 단어 개수에 맞춰서 동적으로 별점 부여 (90% 이상 3별, 70% 이상 2별)
+  const ratio = state.stageCorrect / maxV;
+  const stars = ratio >= 0.9 ? '⭐⭐⭐' : ratio >= 0.7 ? '⭐⭐' : '⭐';
+  
+  state.stageResults.push({stage:STAGES[state.stageIdx].name,correct:state.stageCorrect,stars:stars,max:maxV});
+  const isLast = state.stageIdx >= STAGES.length - 1;
+  $('cp-title').textContent=isLast?'🏠 탈출 성공!':'🎉 구간 통과!';
+  $('cp-stage').textContent=isLast?'안전지대 도착!':STAGES[state.stageIdx+1].name+' 도착!';
+  $('cp-stars').textContent=stars;
+  $('cp-char-img').src=SRC[state.selectedChar];
+  $('checkpoint-popup').querySelector('.cp-btn').textContent=isLast?'결과 보기 🏆':'계속 달려! →';
+  $('checkpoint-popup').classList.add('show');
+}
+
+function nextStage(){ 
+  $('checkpoint-popup').classList.remove('show'); 
+  if(state.stageIdx >= STAGES.length - 1){ showResult(); return; } 
+  state.stageIdx++; 
+  state.hp=3; 
+  loadStage(); 
+  loadNextWord(); 
+}
+
+function showResult(){
+  AudioSys.checkpoint(); cancelAnimationFrame(state.animFrame);
+  $('result-char-img').src=SRC[state.selectedChar];
+  let html='', totStars=0, totalVocab=0;
+  state.stageResults.forEach(r=>{ 
+    totStars += (r.stars.match(/⭐/g)||[]).length; 
+    totalVocab += r.max;
+    html += `<div class="result-row"><span>${r.stage}</span><span>${r.correct}/${r.max} <span class="result-stars">${r.stars}</span></span></div>`; 
+  });
+  const maxStars = STAGES.length * 3;
+  $('result-stats').innerHTML=html; 
+  $('result-total').textContent=`총 ${totStars}⭐ / ${maxStars}⭐ · 정답 ${state.totalCorrect}/${totalVocab}`;
+  showScreen('screen-result');
+}
+
+function showGameOver(){
+  AudioSys.gameover(); cancelAnimationFrame(state.animFrame);
+  $('go-char-img').src=SRC[state.selectedChar];
+  $('go-sub').textContent=`${STAGES[state.stageIdx].name}에서 호랑이에게 잡히고 말았어요...`;
+  showScreen('screen-gameover');
+}
+function retryStage(){ state.hp=3; loadStage(); showScreen('screen-game'); renderLoop(); loadNextWord(); }
+function resetGame(){ cancelAnimationFrame(state.animFrame); showScreen('screen-start'); }
+</script>
+</body>
+</html>
