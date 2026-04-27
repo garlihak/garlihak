@@ -16,7 +16,7 @@ body { font-family:'Jua',sans-serif; background:#1a1a2e; overflow:hidden; width:
 .char-select { display:flex; gap:20px; justify-content:center; width:100%; }
 .char-btn { background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.2); border-radius:20px; padding:16px 20px; cursor:pointer; text-align:center; transition:all 0.2s; flex:1; max-width:160px; }
 .char-btn.selected { background:rgba(255,200,0,0.2); border-color:#ffd700; transform:scale(1.05); }
-.char-btn img { width:90px; height:90px; object-fit:contain; }
+.char-btn img { width:130px; height:130px; object-fit:contain; }
 .char-name { font-size:18px; color:#fff; margin-top:8px; }
 .start-btn { background:linear-gradient(135deg,#ff6b35,#ff4500); border:none; border-radius:50px; padding:18px 56px; font-family:'Jua',sans-serif; font-size:26px; color:#fff; cursor:pointer; box-shadow:0 6px 30px rgba(255,100,0,0.5); }
 .start-btn:active { transform:scale(0.95); }
@@ -461,7 +461,7 @@ function draw(){
     }
   }
 
-  const gY=H*0.75, sz=Math.min(W*0.18,110), now=Date.now()-state.startTime;
+  const gY=H*0.75, sz=Math.min(W*0.25,160), now=Date.now()-state.startTime;
   drawChar(IMG.tiger, state.tigerX*W, gY, sz, true, now-200);
   drawChar(IMG[state.selectedChar], state.playerX*W, gY, sz, false, now);
 
