@@ -132,15 +132,16 @@ const SRC = {
   deer: GITHUB_URL + "deer.png",
   tiger: GITHUB_URL + "tiger.png"
 };
-// 복구된 이미지 로딩 로직
+
+// [수정1] 보안 문제(CORS) 방지를 위해 crossOrigin 설정 추가
 const IMG = {};
 Object.entries(SRC).forEach(([k, v]) => { 
-    const i = new Image(); 
-    i.src = v; 
-    IMG[k] = i; 
+  const i = new Image(); 
+  i.crossOrigin = "Anonymous"; 
+  i.src = v; 
+  IMG[k] = i; 
 });
 
-// 시작 화면 미리보기 이미지 세팅
 document.getElementById('prev-rabbit').src = SRC.rabbit;
 document.getElementById('prev-deer').src = SRC.deer;
 
@@ -166,7 +167,7 @@ const AudioSys = {
   checkpoint(){ this.playTone(523.25,'triangle',0.2,0.3,0); this.playTone(659.25,'triangle',0.2,0.3,0.15); this.playTone(783.99,'triangle',0.4,0.3,0.3); this.playTone(1046.5,'triangle',0.6,0.3,0.45); },
   gameover(){ this.playTone(392,'sawtooth',0.3,0.3,0); this.playTone(349.23,'sawtooth',0.3,0.3,0.3); this.playTone(329.63,'sawtooth',0.3,0.3,0.6); this.playTone(261.63,'sawtooth',0.8,0.3,0.9); },
   scheduleBGM(){
-    if(AudioSys.enabled && state.hp>0 && !$('checkpoint-popup').classList.contains('show') && $('screen-game').classList.contains('active')){
+    if(AudioSys.enabled && state.hp>0 && !document.getElementById('checkpoint-popup').classList.contains('show') && document.getElementById('screen-game').classList.contains('active')){
       const freqs=[130.81,196.22,163.56,196.22];
       AudioSys.playTone(freqs[AudioSys.bgmStep%4],'square',AudioSys.bgmTempo/1000*0.7,0.05);
       AudioSys.bgmStep++;
@@ -174,9 +175,9 @@ const AudioSys = {
     AudioSys.bgmTimer=setTimeout(AudioSys.scheduleBGM, AudioSys.bgmTempo);
   }
 };
-function toggleSound(){ AudioSys.enabled=!AudioSys.enabled; $('sound-btn').textContent=AudioSys.enabled?'🔊':'🔇'; }
+function toggleSound(){ AudioSys.enabled=!AudioSys.enabled; document.getElementById('sound-btn').textContent=AudioSys.enabled?'🔊':'🔇'; }
 
-// ── 데이터 (단어 변경 완료 & 동적 길이 지원) ──
+// ── 데이터 ──
 const STAGES = [
   { name:'🌳 숲 속', bg:['#2d6a1f','#87ceeb'], ground:'#3a7a28', emoji:'🌳', vocab:['싫다','많다','달다','볶다','먹다','걸다','닿다'] },
   { name:'🌊 강가', bg:['#1a4a7a','#5bbcff'], ground:'#1a7a5a', emoji:'🌊', vocab:['넓다','맑다','걷다','앉다','잊다','좋다','잊다'] },
@@ -199,7 +200,7 @@ function startGame(){
 function loadStage(){ Object.assign(state,{vocabIdx:0,stageCorrect:0,playerX:0.15,tigerX:0}); updateHUD(); }
 function updateHUD(){
   const s=STAGES[state.stageIdx];
-  const maxV = s.vocab.length; // 동적 단어 개수
+  const maxV = s.vocab.length;
   $('hud-stage').textContent=`${s.name} · ${state.stageIdx+1}/${STAGES.length} (${Math.min(state.vocabIdx+1,maxV)}/${maxV})`;
   $('hud-fill').style.width=(state.vocabIdx/maxV*100)+'%';
   const hp=$('hp-display'); hp.innerHTML='';
@@ -207,17 +208,40 @@ function updateHUD(){
 }
 
 const canvas=$('game-canvas'), ctx=canvas.getContext('2d');
-function initCanvas(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight-130-160; }
+
+// [수정2] 태블릿 환경에서 캔버스 크기를 유연하고 정확하게 잡아오도록 수정
+function initCanvas(){ 
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+  } else {
+      canvas.width = window.innerWidth; 
+      canvas.height = window.innerHeight - 200; 
+  }
+}
 window.addEventListener('resize',initCanvas);
+
 function renderLoop(){ if(state.animFrame) cancelAnimationFrame(state.animFrame); (function loop(){ draw(); state.animFrame=requestAnimationFrame(loop); })(); }
 
 function drawChar(imgObj, cx, groundY, size, flipX, t){
   if(!imgObj.complete||imgObj.naturalWidth===0) return;
   const bounce=Math.abs(Math.sin(t*0.004))*9;
   const x=cx-size/2, y=groundY-size-bounce;
-  // 그림자
-  ctx.save(); ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath();
-  const ss=1-bounce/40; ctx.ellipse(cx,groundY+2,(size/2)*ss,5*ss,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  
+  // [수정3] 지원되지 않는 ellipse 대신 모든 기기에서 작동하는 호(arc) 그리기 사용
+  ctx.save(); 
+  ctx.fillStyle='rgba(0,0,0,0.2)'; 
+  ctx.beginPath();
+  const ss=1-bounce/40; 
+  const radiusX = (size/2)*ss;
+  const radiusY = 5*ss;
+  ctx.translate(cx, groundY+2);
+  ctx.scale(1, radiusY / radiusX); // 세로를 납작하게 스케일 조정
+  ctx.arc(0, 0, radiusX, 0, Math.PI*2); 
+  ctx.fill(); 
+  ctx.restore();
+
   // 이미지
   ctx.save();
   if(flipX){ ctx.translate(cx+size/2,0); ctx.scale(-1,1); ctx.drawImage(imgObj,0,y,size,size); }
@@ -226,12 +250,10 @@ function drawChar(imgObj, cx, groundY, size, flipX, t){
 }
 
 function drawForest(W,H){
-  // 하늘 그라디언트
   const sky=ctx.createLinearGradient(0,0,0,H*0.72);
   sky.addColorStop(0,'#87ceeb'); sky.addColorStop(1,'#c8f0a0');
   ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
 
-  // 먼 산 실루엣 (느린 스크롤 0.3배)
   const mOff=(bgOffset*0.3)%(W*0.6);
   ctx.fillStyle='#4a8a3a';
   for(let i=-1;i<3;i++){
@@ -242,49 +264,35 @@ function drawForest(W,H){
     ctx.fill();
   }
 
-  // 중간 나무 실루엣 (중간 스크롤 0.7배)
   const tOff=(bgOffset*0.7)%160;
   ctx.fillStyle='#2d5a1f';
   for(let i=-1;i<W/160+2;i++){
     const tx=(i*160-tOff+W)%W - 20;
     const th=H*0.18+Math.sin(i*2.3)*H*0.04;
     const ty=H*0.72-th;
-    // 삼각형 나무 머리
     ctx.beginPath();
     ctx.moveTo(tx+20,ty); ctx.lineTo(tx,ty+th*0.55); ctx.lineTo(tx+40,ty+th*0.55);
     ctx.closePath(); ctx.fill();
-    // 아래 삼각형
     ctx.beginPath();
     ctx.moveTo(tx+20,ty+th*0.3); ctx.lineTo(tx-8,ty+th*0.75); ctx.lineTo(tx+48,ty+th*0.75);
     ctx.closePath(); ctx.fill();
-    // 줄기
     ctx.fillRect(tx+15,ty+th*0.75,10,th*0.25);
   }
 
-  // 땅
   ctx.fillStyle='#3a7a28'; ctx.fillRect(0,H*0.72,W,H*0.28);
-  // 풀잎 들쭉날쭉 선
   ctx.fillStyle='#2d6a1f';
   const gOff=(bgOffset*1.0)%40;
   for(let x=-gOff;x<W+40;x+=18){
-    ctx.beginPath();
-    ctx.moveTo(x,H*0.72);
-    ctx.lineTo(x+5,H*0.72-12);
-    ctx.lineTo(x+9,H*0.72-5);
-    ctx.lineTo(x+14,H*0.72-16);
-    ctx.lineTo(x+18,H*0.72);
-    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x,H*0.72); ctx.lineTo(x+5,H*0.72-12); ctx.lineTo(x+9,H*0.72-5); ctx.lineTo(x+14,H*0.72-16); ctx.lineTo(x+18,H*0.72); ctx.fill();
   }
   ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(0,H*0.72,W,5);
 }
 
 function drawRiver(W,H){
-  // 하늘
   const sky=ctx.createLinearGradient(0,0,0,H*0.72);
   sky.addColorStop(0,'#4a90d9'); sky.addColorStop(1,'#87ceeb');
   ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
 
-  // 먼 배경 언덕 (느린 0.3배)
   const hOff=(bgOffset*0.3)%(W*0.8);
   ctx.fillStyle='#6aaa5a';
   for(let i=-1;i<3;i++){
@@ -296,9 +304,7 @@ function drawRiver(W,H){
     ctx.fill();
   }
 
-  // 강물 (중간 레이어)
   ctx.fillStyle='#5bbcff'; ctx.fillRect(0,H*0.55,W,H*0.17);
-  // 물결 (sin 곡선)
   const wOff=(bgOffset*1.0)%80;
   ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.setLineDash([]);
   for(let row=0;row<3;row++){
@@ -311,7 +317,6 @@ function drawRiver(W,H){
     ctx.stroke();
   }
 
-  // 다리 실루엣 (중간 스크롤 0.5배)
   const bOff=(bgOffset*0.5)%(W*1.2);
   ctx.fillStyle='#8a6a3a';
   const bx=(W*0.4-bOff+W*2)%(W*1.2)-W*0.1;
@@ -321,69 +326,49 @@ function drawRiver(W,H){
     ctx.fillRect(bx+130,H*0.50,12,H*0.22);
   }
 
-  // 땅 (모래색)
   ctx.fillStyle='#c8a05a'; ctx.fillRect(0,H*0.72,W,H*0.28);
-  // 강물 경계
   ctx.fillStyle='#3a8a6a'; ctx.fillRect(0,H*0.72,W,8);
   ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(0,H*0.72,W,5);
 }
 
 function drawMountain(W,H){
-  // 황혼 하늘
   const sky=ctx.createLinearGradient(0,0,0,H*0.72);
   sky.addColorStop(0,'#4a3020'); sky.addColorStop(0.5,'#c07040'); sky.addColorStop(1,'#808080');
   ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
 
-  // 먼 산 (느린 0.2배, 밝은 색)
   const m1Off=(bgOffset*0.2)%(W*1.5);
   ctx.fillStyle='#5a4535';
   for(let i=-1;i<3;i++){
     const mx=(i*(W*1.5)-m1Off+W*3)%(W*3)-W*0.5;
     ctx.beginPath();
-    ctx.moveTo(mx,H*0.72);
-    ctx.lineTo(mx+W*0.3,H*0.18);
-    ctx.lineTo(mx+W*0.6,H*0.35);
-    ctx.lineTo(mx+W*0.75,H*0.20);
-    ctx.lineTo(mx+W*1.0,H*0.72);
-    ctx.fill();
+    ctx.moveTo(mx,H*0.72); ctx.lineTo(mx+W*0.3,H*0.18); ctx.lineTo(mx+W*0.6,H*0.35); ctx.lineTo(mx+W*0.75,H*0.20); ctx.lineTo(mx+W*1.0,H*0.72); ctx.fill();
   }
-  // 중간 산 (중간 0.5배, 어두운 색)
   const m2Off=(bgOffset*0.5)%(W*1.0);
   ctx.fillStyle='#3a2a18';
   for(let i=-1;i<3;i++){
     const mx=(i*W-m2Off+W*2)%(W*2)-W*0.2;
     ctx.beginPath();
-    ctx.moveTo(mx,H*0.72);
-    ctx.lineTo(mx+W*0.2,H*0.30);
-    ctx.lineTo(mx+W*0.4,H*0.45);
-    ctx.lineTo(mx+W*0.55,H*0.28);
-    ctx.lineTo(mx+W*0.7,H*0.72);
-    ctx.fill();
+    ctx.moveTo(mx,H*0.72); ctx.lineTo(mx+W*0.2,H*0.30); ctx.lineTo(mx+W*0.4,H*0.45); ctx.lineTo(mx+W*0.55,H*0.28); ctx.lineTo(mx+W*0.7,H*0.72); ctx.fill();
   }
 
-  // 바위 (빠른 스크롤 0.9배)
+  // [수정4] 산의 바위들도 안전한 그리기 방식으로 통일
   const rOff=(bgOffset*0.9)%200;
   ctx.fillStyle='#6a5040';
   for(let i=-1;i<W/200+2;i++){
     const rx=(i*200-rOff+W)%W;
-    ctx.beginPath();
-    ctx.ellipse(rx,H*0.72,28,16,0,Math.PI,Math.PI*2); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(rx+80,H*0.72,20,12,0,Math.PI,Math.PI*2); ctx.fill();
+    ctx.save(); ctx.translate(rx, H*0.72); ctx.scale(1, 16/28); ctx.beginPath(); ctx.arc(0,0,28,Math.PI,Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(rx+80, H*0.72); ctx.scale(1, 12/20); ctx.beginPath(); ctx.arc(0,0,20,Math.PI,Math.PI*2); ctx.fill(); ctx.restore();
   }
 
-  // 땅
   ctx.fillStyle='#5a4a2a'; ctx.fillRect(0,H*0.72,W,H*0.28);
   ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(0,H*0.72,W,5);
 }
 
 function drawPrairie(W,H){
-  // 밝은 낮 하늘
   const sky=ctx.createLinearGradient(0,0,0,H*0.72);
   sky.addColorStop(0,'#ffffa0'); sky.addColorStop(1,'#aae060');
   ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.72);
 
-  // 먼 언덕 (느린 0.3배)
   const hOff=(bgOffset*0.3)%(W*0.9);
   ctx.fillStyle='#7ab83a';
   for(let i=-1;i<3;i++){
@@ -395,34 +380,19 @@ function drawPrairie(W,H){
     ctx.fill();
   }
 
-  // 억새/해바라기 실루엣 (빠른 1.0배)
   const fOff=(bgOffset*1.0)%100;
   ctx.fillStyle='#5a8a20';
   for(let i=-1;i<W/100+2;i++){
     const fx=(i*100-fOff+W)%W;
     const fh=H*0.12+Math.sin(i*1.7)*H*0.04;
-    // 줄기
     ctx.fillRect(fx+18,H*0.72-fh,4,fh);
-    // 꽃머리 (원)
-    ctx.beginPath();
-    ctx.arc(fx+20,H*0.72-fh-10,10,0,Math.PI*2); ctx.fill();
-    // 꽃잎 색
-    ctx.fillStyle='#d4a020';
-    ctx.beginPath();
-    ctx.arc(fx+20,H*0.72-fh-10,7,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#5a8a20';
-    // 두번째 꽃
+    ctx.beginPath(); ctx.arc(fx+20,H*0.72-fh-10,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#d4a020'; ctx.beginPath(); ctx.arc(fx+20,H*0.72-fh-10,7,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5a8a20';
     ctx.fillRect(fx+55,H*0.72-fh*0.85,3,fh*0.85);
-    ctx.fillStyle='#4a7a18';
-    ctx.beginPath();
-    ctx.arc(fx+56,H*0.72-fh*0.85-8,8,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#c49010';
-    ctx.beginPath();
-    ctx.arc(fx+56,H*0.72-fh*0.85-8,5,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#5a8a20';
+    ctx.fillStyle='#4a7a18'; ctx.beginPath(); ctx.arc(fx+56,H*0.72-fh*0.85-8,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#c49010'; ctx.beginPath(); ctx.arc(fx+56,H*0.72-fh*0.85-8,5,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5a8a20';
   }
 
-  // 땅
   ctx.fillStyle='#6a8a2a'; ctx.fillRect(0,H*0.72,W,H*0.28);
   ctx.fillStyle='#5a7a1a'; ctx.fillRect(0,H*0.72,W,6);
   ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(0,H*0.72,W,4);
@@ -433,7 +403,6 @@ function draw(){
   ctx.clearRect(0,0,W,H);
   bgOffset=(bgOffset+0.4)%(W*3);
 
-  // 구간별 배경 그리기
   if(state.stageIdx===0) drawForest(W,H);
   else if(state.stageIdx===1) drawRiver(W,H);
   else if(state.stageIdx===2) drawMountain(W,H);
@@ -447,7 +416,7 @@ function draw(){
   ctx.beginPath(); ctx.moveTo(0,H*0.75); ctx.lineTo(W,H*0.75); ctx.stroke(); ctx.setLineDash([]);
 
   const popup=$('checkpoint-popup').classList.contains('show');
-  const maxV = STAGES[state.stageIdx].vocab.length; // 동적 단어 개수
+  const maxV = STAGES[state.stageIdx].vocab.length;
   
   if(state.hp>0 && !popup && state.vocabIdx<maxV){
     const dist=state.playerX-state.tigerX;
@@ -528,7 +497,6 @@ function handleAnswer(correct,heard){
 function showCheckpoint(){
   AudioSys.checkpoint();
   const maxV = STAGES[state.stageIdx].vocab.length;
-  // 단어 개수에 맞춰서 동적으로 별점 부여 (90% 이상 3별, 70% 이상 2별)
   const ratio = state.stageCorrect / maxV;
   const stars = ratio >= 0.9 ? '⭐⭐⭐' : ratio >= 0.7 ? '⭐⭐' : '⭐';
   
